@@ -1,35 +1,52 @@
+import Base.eltype
+
 abstract type AbstractDomain end
-
 abstract type UnstructuredDomain <: AbstractDomain end
-
 abstract type StructuredDomain <: AbstractDomain end
 
-struct RGDomain <: StructuredDomain
-    shape
-    distances
-    harmonic::Bool
-    dtype::DataType
-    RGDomain(shape...; distances = 1 ./ shape, harmonic = false, dtype = Float64) = new(shape, distances, harmonic, dtype)
+struct RGDomain{N, S, D, H, T} <: StructuredDomain
+    #Those fields only exist to enforce the length and data type of shape and distances
+    shape::NTuple{N,UInt32}
+    distances::NTuple{N,T}
+    RGDomain(shape...; distances = 1 ./ shape, harmonic = false, dtype = Float64) = new{length(shape), shape, distances, harmonic, dtype}(shape, distances)
+end
+
+shape(::RGDomain{N, S, D, H, T}) where {N, S, D, H, T} = S
+distances(::RGDomain{N, S, D, H, T}) where {N, S, D, H, T} = D
+is_harmonic(::RGDomain{N, S, D, H, T}) where {N, S, D, H, T} = H
+eltype(::RGDomain{N, S, D, H, T}) where {N, S, D, H, T} = T
+is_complex(::RGDomain{N, S, D, H, T}) where {N, S, D, H, T} = T <: Complex
+
+function get_codomain(domain::RGDomain) 
+    return RGDomain(shape(domain)...;
+                    distances = shape(domain) .* distances(domain),
+                    harmonic = !is_harmonic(domain),
+                    dtype = eltype(domain))
 end
 
 ################################################################################
 ################################################################################
 #Power Domain
-struct PowerDomain
-    shape
-    distances
-    dtype::DataType
+
+struct PowerDomain{Dom} <: StructuredDomain where Dom <: RGDomain
+    #_pindices::Vector{length(shape(Dom)), UInt32}
+    #_kvec::Vector{1, eltype(Dom)}
     _pindices
     _kvec
-    PowerDomain(shape...; distances = 1 ./ shape, dtype = Float64) = begin
-        @assert length(shape) == length(distances)
-        kvec, karr = get_k_vals(shape, distances, dtype)
-        pindices = get_pindices(shape, kvec, karr)
-        new(shape, distances, dtype, pindices, kvec)
+    PowerDomain(domain::RGDomain{N, S, D, true, T}) where {N, S, D, T} = begin
+        kvec, karr = get_k_vals(shape(domain), distances(domain), eltype(domain))
+        pindices = get_pindices(shape(domain), kvec, karr)
+        new{domain}(pindices, kvec)
     end
 end
 
-PowerDomain(domain::RGDomain) = PowerDomain(domain.shape; distances = domain.distances, dtype = domain.dtype)
+#PowerDomain(shape...; distances = 1 ./ shape, dtype = Float64) = begin
+#    @assert length(shape) == length(distances)
+#    kvec, karr = get_k_vals(shape, distances, dtype)
+#    pindices = get_pindices(shape, kvec, karr)
+#    domain = RGDomain(shape; distances = distances, harmonic = true, dtype = dtype)
+#    new{domain}(pindices, kvec)
+#end
 
 #Get all unique k-values and an array with the corresponding k-values
 function get_k_vals(shape, distances, dtype)
@@ -58,6 +75,4 @@ function get_pindices(shape, kvec, karr)
     return pindex
 end
 
-
-
-#field[I] = kvec[pindex[I]]
+shape(dom::PowerDomain) = size(dom._kvec)

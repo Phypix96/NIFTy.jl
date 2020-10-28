@@ -1,18 +1,30 @@
-import Base.eachindex
+import Base.eachindex, Base.getindex, Base.randn
+
+include("Domain.jl")
 
 abstract type AbstractField end
+abstract type Linearization end
 
-struct Field <: AbstractField
-    domain
-    val
+
+mutable struct Field{domain} <: AbstractField
+    val::Array
 end
 
-struct MultiField
-
+field(domain, val) = begin
+    println(shape(domain))
+    println(size(val))
+    @assert shape(domain) == size(val)
+    Field{domain}(val)
 end
 
-function in(f::AbstractField)
-    error()
+mutable struct MultiField <: AbstractField
+    domains::Tuple
+    vals::Tuple
 end
 
-eachindex(f::AbstractField) = eachindex(f.val)
+#getindex(f::Field, i) = getindex(f.val, i)
+getindex(f::Field, i...) = getindex(f.val, i...)
+eachindex(f::Field) = eachindex(f.val)
+#Use Metaprogramming here!
+randn(d::AbstractDomain) = field(d, randn(shape(d)))
+rand(d::AbstractDomain) = field(d, rand(shape(d)))
