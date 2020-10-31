@@ -1,7 +1,7 @@
 #TODO macro for cleaner type signature
-function PowerDistribute!(f::Field{T, N, S, Dom},
-                          ps::Field{Tp, Np, Sp, PowerDomain{N, Dom}},
-                          out::Field{T, N, S, Dom}) where {T, N, S, Dom <: StructuredDomain, Tp, Np, Sp}
+function PowerDistribute!(f::Field{T, N, Dom},
+                          ps::Field{Tp, Np, PowerDomain{N, Dom}},
+                          out::Field{T, N, Dom}) where {T, N, Dom <: StructuredDomain, Tp, Np}
     pind = pindices(ps)
     for i in eachindex(f)
         out[i] = f[i]*ps[pind[i]]
@@ -9,12 +9,12 @@ function PowerDistribute!(f::Field{T, N, S, Dom},
     return nothing
 end
 
-function PowerDistribute!(f::Field{T, N, S, Dom}, ps::Field{Tp, Np, Sp, PowerDomain{N, Dom}}) where {T, N, S, Dom <: StructuredDomain, Tp, Np, Sp}
+function PowerDistribute!(f::Field{T, N, Dom}, ps::Field{Tp, Np, PowerDomain{N, Dom}}) where {T, N, Dom <: StructuredDomain, Tp, Np}
     PowerDistribute(f, ps, f)
     return nothing
 end
 
-function PowerDistribute(f::Field{T, N, S, Dom}, ps::Field{Tp, Np, Sp, PowerDomain{N, Dom}}) where {T, N, S, Dom, Tp, Np, Sp}
+function PowerDistribute(f::Field{T, N, Dom}, ps::Field{Tp, Np, PowerDomain{N, Dom}}) where {T, N, Dom, Tp, Np}
     out = similar(f)
     PowerDistribute!(f, ps, out)
     return out
