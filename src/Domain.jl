@@ -1,35 +1,44 @@
-import Base.eltype, Base.size
+#import Base.eltype, Base.size
 
-abstract type AbstractDomain end
-abstract type UnstructuredDomain <: AbstractDomain end
-abstract type StructuredDomain <: AbstractDomain end
+abstract type AbstractDomain{N} end
+abstract type Domain{N}  <: AbstractDomain{N} end
+abstract type UnstructuredDomain{N} <: Domain{N} end
+abstract type StructuredDomain{N} <: Domain{N} end
 
-struct RGDomain{N, H, L} <: StructuredDomain
+dims(::AbstractDomain{N}) where {N} = N
+################################################################################
+################################################################################
+#RGDomain
+
+struct RGDomain{N, H, L} <: StructuredDomain{N}
     _shape::NTuple{N, UInt}
     _lengths::NTuple{N, T} where T
-    RGDomain(shape...; lengths = map(x -> 1., shape), harmonic = false) = begin
+    function RGDomain(shape...; lengths = map(x -> 1., shape), harmonic = false)
+        lengths = tuple(lengths...)
         new{length(shape), harmonic, lengths}(shape, lengths)
     end
+    #function RGDomain(shape...; distances = 1 ./ shape, harmonic = false)
+    #    lengths = tuple((shape .* distances)...)
+    #    new{length(shape), harmonic, lengths}(shape, lengths)
+    #end
 end
 
-#function RGDomain(shape...; distances = 1 ./ shape, harmonic = false)
-    #RGDomain(shape; lengths = shape .* distances, harmonic)
-#end
-size(domain::RGDomain) = domain._shape
+shape(domain::RGDomain) = size(domain)
+#size(domain::RGDomain) = domain._shape
+size(domain::RGDomain) = Int.(domain._shape)
 lengths(::RGDomain{N, H, L}) where {N, H, L} = L
-dims(::RGDomain{N, H, L}) where {N, H, L} = N
-is_harmonic(::RGDomain{N, H, L}) where {N, H, L} = H
+isharmonic(::RGDomain{N, H, L}) where {N, H, L} = H
 distances(domain::RGDomain) = lengths(domain) ./ size(domain)
 
 function get_codomain(domain::RGDomain) 
-    return RGDomain(size(domain)...; lengths = size(domain) ./ lengths(domain), harmonic = !is_harmonic(domain))
+    return RGDomain(size(domain)...; lengths = size(domain) ./ lengths(domain), harmonic = !isharmonic(domain))
 end
 
 ################################################################################
 ################################################################################
 #Power Domain
 
-struct PowerDomain{N, Dom} <: StructuredDomain where Dom <: RGDomain{N, true, L} where {N <: Integer, L <: DataType}
+struct PowerDomain{N, Dom} <: StructuredDomain{N} where Dom <: RGDomain{_N, true, _L} where {_N, _L}
     _pindices::Array{UInt32, N}
     _kvec::Array{T, 1} where T <: Real
     PowerDomain(domain::RGDomain{N, true, L}, dtype = Float64) where {N, L} = begin
@@ -37,15 +46,15 @@ struct PowerDomain{N, Dom} <: StructuredDomain where Dom <: RGDomain{N, true, L}
         pindices = get_pindices(size(domain), kvec, karr)
         typeof(domain) == DataType ? new{N, domain}(pindices, kvec) : new{N, typeof(domain)}(pindices, kvec)
     end
+    PowerDomain(shape...; distances = 1 ./ shape, dtype = Float64) = begin
+        @assert length(shape) == length(distances)
+        kvec, karr = get_k_vals(shape, distances, dtype)
+        pindices = get_pindices(shape, kvec, karr)
+        domain = RGDomain(shape; distances = distances, harmonic = true, dtype = dtype)
+        new{dims(domain), domain}(pindices, kvec)
+    end
 end
 
-#PowerDomain(shape...; distances = 1 ./ shape, dtype = Float64) = begin
-#    @assert length(shape) == length(distances)
-#    kvec, karr = get_k_vals(shape, distances, dtype)
-#    pindices = get_pindices(shape, kvec, karr)
-#    domain = RGDomain(shape; distances = distances, harmonic = true, dtype = dtype)
-#    new{domain}(pindices, kvec)
-#end
 
 #Get all unique k-values and an array with the corresponding k-values
 function get_k_vals(shape, distances, dtype)
@@ -74,6 +83,24 @@ function get_pindices(shape, kvec, karr)
     return pindex
 end
 
-
 size(dom::PowerDomain) = size(dom._kvec)
 dims(::PowerDomain) = 1
+
+
+################################################################################
+################################################################################
+#DomainTuple
+
+struct DomainTuple{N} <: AbstractDomain{N}
+    domains::Tuple{Vararg{<:Domain}}
+    DomainTuple(domains...) = begin
+        N = mapreduce(dims, +, domains)
+        new{N}(domains)
+    end
+end
+
+domains(dom::DomainTuple) = dom.domains
+shape(dom::DomainTuple) = map(size, domains(dom))
+size(dom::DomainTuple) = tuple(mapreduce(x -> [size(x)...], vcat, domains(dom))...)
+length(dom::DomainTuple) = prod(size(dom))
+#length(dom::DomainTuple) = prod(length(domains))
