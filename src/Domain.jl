@@ -17,10 +17,6 @@ struct RGDomain{N, H, L} <: StructuredDomain{N}
         lengths = tuple(lengths...)
         new{length(shape), harmonic, lengths}(shape, lengths)
     end
-    #function RGDomain(shape...; distances = 1 ./ shape, harmonic = false)
-    #    lengths = tuple((shape .* distances)...)
-    #    new{length(shape), harmonic, lengths}(shape, lengths)
-    #end
 end
 
 shape(domain::RGDomain) = size(domain)
@@ -30,7 +26,7 @@ lengths(::RGDomain{N, H, L}) where {N, H, L} = L
 isharmonic(::RGDomain{N, H, L}) where {N, H, L} = H
 distances(domain::RGDomain) = lengths(domain) ./ size(domain)
 
-function get_codomain(domain::RGDomain) 
+function getcodomain(domain::RGDomain) 
     return RGDomain(size(domain)...; lengths = size(domain) ./ lengths(domain), harmonic = !isharmonic(domain))
 end
 

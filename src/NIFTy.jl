@@ -11,6 +11,7 @@ include("Distributor.jl")
 
 export AbstractDomain, Domain, UnstructuredDomain, StructuredDomain,
        RGDomain, PowerDomain, DomainTuple,
+       rgdomain,
        lengths, isharmonic, distances, dims, shape,
        getcodomain, 
        domains,
