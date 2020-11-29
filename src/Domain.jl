@@ -13,8 +13,8 @@ dims(::AbstractDomain{N}) where {N} = N
 struct RGDomain{N, H, L} <: StructuredDomain{N}
     _shape::NTuple{N, UInt}
     _lengths::NTuple{N, T} where T
-    function RGDomain(shape...; lengths = map(x -> 1., shape), harmonic = false)
-        lengths = tuple(lengths...)
+    function RGDomain(shape...; T = Float64, lengths = map(x -> T(1), shape), harmonic = false)
+        lengths = tuple(T.(lengths)...)
         new{length(shape), harmonic, lengths}(shape, lengths)
     end
 end
@@ -22,6 +22,7 @@ end
 shape(domain::RGDomain) = size(domain)
 #size(domain::RGDomain) = domain._shape
 size(domain::RGDomain) = Int.(domain._shape)
+length(domain::RGDomain) = prod(size(domain))
 lengths(::RGDomain{N, H, L}) where {N, H, L} = L
 isharmonic(::RGDomain{N, H, L}) where {N, H, L} = H
 distances(domain::RGDomain) = lengths(domain) ./ size(domain)

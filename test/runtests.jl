@@ -5,7 +5,8 @@ using Test
     # Write your tests here.
 
     @testset "Domain" begin
-        @testset "Functions" begin
+        #TODO put dimension as parameter in testset
+        @testset "Basics" begin
             for s in ((3,), (3,3), (3,3,3))
                 dom = RGDomain(s...)
                 @test lengths(dom) == map(x -> 1., size(dom))
@@ -44,8 +45,36 @@ using Test
         end
     end
 
-    @testset "Field" begin
-        dom = 
-        f = 
+    @testset "Field $dim-dim of $T" for dim = 1:3, T = [Int, Float64, Float32, ComplexF64]
+        s = ntuple(x -> 3, dim)
+        dom = RGDomain(s...)
+
+        f = randn(T, dom)
+        g = similar(f)
+        @test eltype(f) == T
+        for func in [size, shape, length]
+            @test @eval $func($f) == $func($g) == $func($dom)
+        end
+
+        val = fill(1, s.+1)
+        @test_throws AssertionError Field(dom, val)
+
+        #TODO make val imutable if assigned to field!
+        v1 = T(4)
+        v2 = T(2)
+        val = fill(v1, s)
+        f = Field(dom, val)
+        val = fill(v2, s)
+        g = Field(dom, val)
+        for op in [:+, :-, :*, :/]
+            h = @eval broadcast($op, $f, $g)
+            @test getdomain(h) == dom
+            @test h.val == fill((@eval $T($op($v1, $v2))), s)
+        end
+        !(T <: Integer) && for op in [:exp, :log, :sin, :cos, :tan]
+            h = @eval broadcast($op, $g)
+            @test getdomain(h) == dom
+            @test h.val == fill((@eval $T($op($v2))), s)
+        end
     end
 end

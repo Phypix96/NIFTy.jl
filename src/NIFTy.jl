@@ -17,7 +17,7 @@ export AbstractDomain, Domain, UnstructuredDomain, StructuredDomain,
        domains,
        #Field.jl
        Field,
-       field, similar, getdomain,
+       similar, getdomain,
        #Functions.jl
        hartley, ihartley
 
