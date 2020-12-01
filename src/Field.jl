@@ -22,8 +22,8 @@ struct FieldStyle{N, Dom} <: Broadcast.AbstractArrayStyle{N} end
 Base.BroadcastStyle(::Type{<:Field{T, N, Dom}}) where {T, N, Dom} = FieldStyle{N, Dom}()
 Base.BroadcastStyle(::FieldStyle{N, Dom}, ::FieldStyle{N, Dom}) where {N, Dom} = FieldStyle{N, Dom}()
 Base.BroadcastStyle(::FieldStyle, ::FieldStyle) = error("Domain mismatch")
-Base.BroadcastStyle(::Broadcast.Style{<:Number}, ::FieldStyle{N, Dom}) where {N, Dom} = FieldStyle{N, Dom}()
-Base.BroadcastStyle(::FieldStyle{N, Dom}, ::Broadcast.Style{<:Number}) where {N, Dom} = FieldStyle{N, Dom}()
+#Base.BroadcastStyle(::Broadcast.Style{<:Number}, ::FieldStyle{N, Dom}) where {N, Dom} = FieldStyle{N, Dom}()
+#Base.BroadcastStyle(::FieldStyle{N, Dom}, ::Broadcast.Style{<:Number}) where {N, Dom} = FieldStyle{N, Dom}()
 
 similar(f::Field) = similar(f, eltype(f), size(f))
 similar(f::Field, ::Type{T}, ::Tuple{Vararg{Int64, N}}) where {T, N} = Field(f.domain, similar(f.val, T))
@@ -32,8 +32,9 @@ function similar(bc::Broadcast.Broadcasted{FieldStyle{N, Dom}}, ::Type{ElType}) 
     return Field(domain, similar(Array{ElType}, axes(bc)))
 end
 
-getdomain(bc::Base.Broadcast.Broadcasted) = getdomain(bc.args)
-getdomain(args::Tuple{Vararg{Field}}) = getdomain(args[1])
+getdomain(bc::Base.Broadcast.Broadcasted) = getdomain(bc.args...)
+#TODO assure, that all args have the same domain?
+getdomain(args::Vararg{Field}) = getdomain(args[1])
 getdomain(f::Field) = f.domain
 
 shape(f::Field) = shape(f.domain)
