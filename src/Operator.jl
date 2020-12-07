@@ -40,16 +40,20 @@ end
 
 function combine_operators(op1::PointwiseOperator, op2::PointwiseOperator)
     @assert op1.domain == op2.domain
-    operation(x) = op1.operation(op2.operation(x))
-    adjoint(x) = op2.adjoint(op1.adjoint(x))
-    linearization(x) = begin 
-        x, lin2 = op2.linearization(x)
-        x, lin1= op1.linearization(x)
-        jac(x) = lin1*lin2*x
-        return x, jac
-    end
-    return PointwiseOperator(op1.domain, operation, adjoint, linearization)
+    operations = vcat(op1.operations, op2.operations)
+    gradients = vcat(op1.gradients, op2.gradients)
+    return PointwiseOperator(op2.domain, operations, gradients)
 end
+#    operation(x) = op1.operation(op2.operation(x))
+#    adjoint(x) = op2.adjoint(op1.adjoint(x))
+#    linearization(x) = begin 
+#        x, lin2 = op2.linearization(x)
+#        x, lin1= op1.linearization(x)
+#        jac(x) = lin1*lin2*x
+#        return x, jac
+#    end
+#    return PointwiseOperator(op1.domain, operation, linearization)
+#end
 
 function combine_operators(op1, op2)
     @assert op1.target == op2.domain
@@ -73,9 +77,10 @@ function apply(op::LinearOperator, val)
 end
 
 function apply(op::PointwiseOperator, val)
-    res = similar(val)
+    res = copy(val)
     for operation in op.operations
-        @avx @. res = operation(res)
+        #@avx @. res = operation(res)
+        @. res = operation(res)
     end
     return res
 end

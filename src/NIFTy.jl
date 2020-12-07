@@ -22,8 +22,8 @@ export AbstractDomain, Domain, UnstructuredDomain, StructuredDomain,
        Field,
        similar, getdomain,
        #Functions.jl
-       hartley, ihartley
+       hartley, ihartley, 
        #Operator.jl
        AbstractOperator, LinearOperator, PointwiseOperator, OperatorChain, Operator,
-       apply
+       combine_operators, apply
 end
