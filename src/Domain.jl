@@ -13,7 +13,10 @@ dims(::AbstractDomain{N}) where {N} = N
 struct RGDomain{N, H, L} <: StructuredDomain{N}
     _shape::NTuple{N, UInt}
     _lengths::NTuple{N, T} where T
-    function RGDomain(shape...; T = Float64, lengths = map(x -> T(1), shape), harmonic = false)
+    RGDomain(shape...;
+             T = Float64,
+             harmonic = false,
+             lengths = harmonic ? T.(shape) : ones(T, length(shape))) = begin
         lengths = tuple(T.(lengths)...)
         new{length(shape), harmonic, lengths}(shape, lengths)
     end
@@ -36,29 +39,29 @@ end
 #Power Domain
 
 struct PowerDomain{N, Dom} <: StructuredDomain{N} where Dom <: RGDomain{_N, true, _L} where {_N, _L}
+    _codomain::StructuredDomain{N}
     _pindices::Array{UInt32, N}
     _kvec::Array{T, 1} where T <: Real
-    PowerDomain(domain::RGDomain{N, true, L}, dtype = Float64) where {N, L} = begin
-        kvec, karr = get_k_vals(size(domain), distances(domain), dtype)
+    PowerDomain(domain::RGDomain{N, true, L}, T = Float64) where {N, L} = begin
+        kvec, karr = get_k_vals(size(domain), distances(domain), T)
         pindices = get_pindices(size(domain), kvec, karr)
-        typeof(domain) == DataType ? new{N, domain}(pindices, kvec) : new{N, typeof(domain)}(pindices, kvec)
+        new{N, typeof(domain)}(domain, pindices, kvec)
     end
-    PowerDomain(shape...; T = Float64, lengths = T.(shape)) = begin
-        @assert length(shape) == length(lengths)
-        distances = lengths ./ shape
-        kvec, karr = get_k_vals(shape, distances, T)
-        pindices = get_pindices(shape, kvec, karr)
-        domain = RGDomain(shape...; T = T, lengths = lengths, harmonic = true)
-        new{dims(domain), typeof(domain)}(pindices, kvec)
-    end
+end
+
+function PowerDomain(shape::Vararg{Integer}; T = Float64, lengths = T.(shape))
+    @assert length(shape) == length(lengths)
+    distances = lengths ./ shape
+    domain = RGDomain(shape...; T = T, lengths = lengths, harmonic = true)
+    return PowerDomain(domain, T)
 end
 
 
 #Get all unique k-values and an array with the corresponding k-values
-function get_k_vals(shape, distances, dtype)
+function get_k_vals(shape, distances, T)
     C = CartesianIndices(div.(shape, 2) .+1)
-    k_vec = Array{dtype}(undef, length(C))
-    k_arr = similar(C, dtype)
+    k_vec = Array{T}(undef, length(C))
+    k_arr = similar(C, T)
     for (i, I) in enumerate(C)
         k = sqrt(sum(((Tuple(I) .- 1) .*distances).^2))
         k_vec[i] = k
@@ -83,7 +86,7 @@ end
 
 size(dom::PowerDomain) = size(dom._kvec)
 dims(::PowerDomain) = 1
-
+codomain(dom::PowerDomain) = dom._codomain
 
 ################################################################################
 ################################################################################

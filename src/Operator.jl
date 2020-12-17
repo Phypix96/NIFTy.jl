@@ -25,8 +25,8 @@ struct PointwiseOperator <: AbstractOperator
 end
 
 struct OperatorChain <: AbstractOperator
-    domain::AbstractDomain
-    target::AbstractDomain
+    domain::Union{AbstractDomain, Tuple{Vararg{AbstractDomain}}}
+    target::Union{AbstractDomain, Tuple{Vararg{AbstractDomain}}}
     operators::Array{O} where O <: AbstractOperator
 end
 
@@ -42,6 +42,9 @@ target(op::LinearOperator) = op.target
 
 domain(op::PointwiseOperator) = op.domain
 target(op::PointwiseOperator) = op.domain
+
+domain(op::OperatorChain) = op.domain
+target(op::OperatorChain) = op.target
 
 get_operators(op::AbstractOperator) = identity(op)
 get_operators(op::OperatorChain) = op.operators
@@ -82,87 +85,79 @@ end
 #TODO generalize to NTuple for val
 function (op::AbstractOperator)(val)
     res = deepcopy(val)
-    apply!(op, res)
-    return res
+    return apply!(op, val)
 end
 
 function (op::AbstractOperator)(vals...)
-    res = apply(op, vals...)
+    res = deepcopy(vals)
+    res = apply!(op, res)
     return res
 end
 
-#NOTE this definition might be unnecessary
-function apply(op::AbstractOperator, val)
-    res = deepcopy(val)
-    apply!(op, re)
-end
-
-function apply!(op::Operator, val)
-    val .= op.operation(val)
-end
-
-function apply!(op::LinearOperator, val)
+function apply!(op::LinearOperator, val::AbstractArray)
     for operation in op.operations
-        val .= @avx operation(val)
+        val = operation(val)
     end
+    return val
 end
 
 #TODO generalize to NTuple for val
-function apply!(op::PointwiseOperator, val)
+function apply!(op::PointwiseOperator, val::AbstractArray)
     for operation in op.operations
         @avx @. val = operation(val)
     end
+    return val
 end
 
 function apply!(op::OperatorChain, val)
     for operator in op.operators
-        val .= apply!(operator, val)
+        val = apply!(operator, val)
     end
+    return val
 end
 
 
-
-#function apply!(op::AddOperator, val1, val2)
+#function apply!(op::AdditionOperator, val1, val2)
 #    @avx @. val1 += val2
 #end
-#function apply!(op::MultiplyOperator, val1, val2)
+#function apply!(op::MultiplicationOperator, val1, val2)
 #    @avx @. val1 *= val2
 #end
 ####################################################################################################
 ####################################################################################################
 #apply linearization Interface
 
-function (op::Operator)(val, jac)
-    new_jac(x) = op.jacobian(val, jac(x))
-    new_val = op.operation(val)
-    return (new_val, new_jac)
-end
-
-function (op::LinearOperator)(val, jac)
-    res = op(val)
-    jacobian(x) = op(jac(x))
-    return res, jacobian
-end
-
-function (op::PointwiseOperator)(val, jac)
-    gradient = ones(size(val))
-    res = copy(val)
-    for (operation, grad) in zip(op.operations, op.gradients)
-        @avx @. gradient *= grad(res)
-        @avx @. res = operation(res)
-    end
-    jacobian(x) = @avx gradient .* jac(x)
-    return res, jacobian
-end
-
-function (op::OperatorChain)(val, jac)
-    res = copy(val)
-    for operator in op.operators
-        #TODO here, res can be modified by apply, so pointwise operators don't need to make a copy
-        res, jac = operator(res, jac)
-    end
-    return res, jac
-end
+#function (op::Operator)(val, jac)
+#    new_jac(x) = op.jacobian(val, jac(x))
+#    new_val = op.operation(val)
+#    return (new_val, new_jac)
+#end
+#
+#function (op::LinearOperator)(val, jac)
+#    res = op(val)
+#    jacobian(x) = op(jac(x))
+#    return res, jacobian
+#end
+#
+#function (op::PointwiseOperator)(val, jac)
+#    gradient = ones(size(val))
+#    res = copy(val)
+#    for (operation, grad) in zip(op.operations, op.gradients)
+#        @avx @. gradient *= grad(res)
+#        @avx @. res = operation(res)
+#    end
+#    jacobian(x) = @avx gradient .* jac(x)
+#    return res, jacobian
+#end
+#
+#function (op::OperatorChain)(val, jac)
+#    res = copy(val)
+#    for operator in op.operators
+#        #TODO here, res can be modified by apply, so pointwise operators don't need to make a copy
+#        res, jac = operator(res, jac)
+#    end
+#    return res, jac
+#end
 
 ####################################################################################################
 ####################################################################################################
@@ -172,7 +167,8 @@ adjoint(op::LinearOperator) = LinearOperator(target(op), domain(op), op.adjoints
 
 
 
-exp(dom) = PointwiseOperator(dom, [exp], [exp])
+exp(dom::AbstractDomain) = PointwiseOperator(dom, [exp], [exp])
+exp(op::AbstractOperator) = PointwiseOperator(target(op), [exp], [exp])(op)
 log(dom) = PointwiseOperator(dom, [log], [inv])
 sin(dom) = PointwiseOperator(dom, [cos], [sin])
 cos(dom) = PointwiseOperator(dom, [cos], [-, sin])

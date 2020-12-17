@@ -31,5 +31,5 @@ export AbstractDomain, Domain, UnstructuredDomain, StructuredDomain,
        combine_operators, apply!, apply,
        add, scale,
        #Distributor.jl
-       DistributionOperator
+       DistributionOperator, PowerDistributor
 end
