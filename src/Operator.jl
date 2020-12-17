@@ -1,3 +1,6 @@
+#TODO handle identity separately in pointwise operators
+
+
 abstract type AbstractOperator end
 
 struct Operator <: AbstractOperator
@@ -30,35 +33,45 @@ end
 
 ####################################################################################################
 ####################################################################################################
+#Property interfaces
+domain(op::Operator) = op.domain
+target(op::Operator) = op.target
+
+domain(op::LinearOperator) = op.domain
+target(op::LinearOperator) = op.target
+
+domain(op::PointwiseOperator) = op.domain
+target(op::PointwiseOperator) = op.domain
+
+get_operators(op::AbstractOperator) = identity(op)
+get_operators(op::OperatorChain) = op.operators
+
+####################################################################################################
+####################################################################################################
 #combine_operators Interface
-function combine_operators(op1::LinearOperator, op2::LinearOperator)
-    @assert op1.target == op2.domain
-    operation(x) = op1.operation(op2.operation(x))
-    adjoint(x) = op1.adjoint(op2.adjoint(x))
-    return LinearOperator(op1.domain, op2.target, operation, adjoint)
+function (op_later::AbstractOperator)(op_first::AbstractOperator)
+    return combine_operators(op_later, op_first)
 end
 
-function combine_operators(op1::PointwiseOperator, op2::PointwiseOperator)
-    @assert op1.domain == op2.domain
-    operations = vcat(op1.operations, op2.operations)
-    gradients = vcat(op1.gradients, op2.gradients)
-    return PointwiseOperator(op2.domain, operations, gradients)
-end
-#    operation(x) = op1.operation(op2.operation(x))
-#    adjoint(x) = op2.adjoint(op1.adjoint(x))
-#    linearization(x) = begin 
-#        x, lin2 = op2.linearization(x)
-#        x, lin1= op1.linearization(x)
-#        jac(x) = lin1*lin2*x
-#        return x, jac
-#    end
-#    return PointwiseOperator(op1.domain, operation, linearization)
-#end
 
-function combine_operators(op1, op2)
-    @assert op1.target == op2.domain
-    operators = vcat(operators(op1), operators(op2))
-    return OperatorChain(op2.domain, op1.target, operators)
+function combine_operators(op_later::LinearOperator, op_first::LinearOperator)
+    @assert target(op_first) == domain(op_later)
+    operations = vcat(op_first.operations, op_later.operations)
+    adjoints = vcat(op_later.adjoints, op_first.adjoints)
+    return LinearOperator(op_later.domain, op_first.target, operations, adjoints)
+end
+
+function combine_operators(op_later::PointwiseOperator, op_first::PointwiseOperator)
+    @assert domain(op_later) == domain(op_first)
+    operations = vcat(op_first.operations, op_later.operations)
+    gradients = vcat(op_first.gradients, op_later.gradients)
+    return PointwiseOperator(op_first.domain, operations, gradients)
+end
+
+function combine_operators(op_later, op_first)
+    @assert target(op_first) == domain(op_later)
+    operators = vcat(get_operators(op_first), get_operators(op_later))
+    return OperatorChain(domain(op_first), target(op_later), operators)
 end
 
 
@@ -66,122 +79,105 @@ end
 ####################################################################################################
 #apply Interface
 
-apply(op::Operator, val) = op.operation(val)
-
-function apply(op::LinearOperator, val)
-    res = op.operations[1](val)
-    for operation in op.operations[2:end]
-        res = @avx operation(res)
-    end
+#TODO generalize to NTuple for val
+function (op::AbstractOperator)(val)
+    res = deepcopy(val)
+    apply!(op, res)
     return res
 end
 
-function apply(op::PointwiseOperator, val)
-    res = copy(val)
+function (op::AbstractOperator)(vals...)
+    res = apply(op, vals...)
+    return res
+end
+
+#NOTE this definition might be unnecessary
+function apply(op::AbstractOperator, val)
+    res = deepcopy(val)
+    apply!(op, re)
+end
+
+function apply!(op::Operator, val)
+    val .= op.operation(val)
+end
+
+function apply!(op::LinearOperator, val)
     for operation in op.operations
-        #@avx @. res = operation(res)
-        @. res = operation(res)
+        val .= @avx operation(val)
     end
-    return res
 end
 
-function apply(op::OperatorChain, val)
-    res = copy(val)
+#TODO generalize to NTuple for val
+function apply!(op::PointwiseOperator, val)
+    for operation in op.operations
+        @avx @. val = operation(val)
+    end
+end
+
+function apply!(op::OperatorChain, val)
     for operator in op.operators
-        res = apply(operator, res)
+        val .= apply!(operator, val)
     end
-    return res
 end
 
-####################################################################################################
 
-function apply(op::Operator, val, jac)
+
+#function apply!(op::AddOperator, val1, val2)
+#    @avx @. val1 += val2
+#end
+#function apply!(op::MultiplyOperator, val1, val2)
+#    @avx @. val1 *= val2
+#end
+####################################################################################################
+####################################################################################################
+#apply linearization Interface
+
+function (op::Operator)(val, jac)
     new_jac(x) = op.jacobian(val, jac(x))
     new_val = op.operation(val)
     return (new_val, new_jac)
 end
 
-function apply(op::LinearOperator, val, jac)
-    res = apply(op, val)
-    jacobian(x) = apply(op, jac(x))
+function (op::LinearOperator)(val, jac)
+    res = op(val)
+    jacobian(x) = op(jac(x))
     return res, jacobian
 end
 
-function apply(op::PointwiseOperator, val, jac)
+function (op::PointwiseOperator)(val, jac)
     gradient = ones(size(val))
     res = copy(val)
     for (operation, grad) in zip(op.operations, op.gradients)
         @avx @. gradient *= grad(res)
         @avx @. res = operation(res)
     end
-    jacobian(x) = @avx gradient .* jac(x) 
+    jacobian(x) = @avx gradient .* jac(x)
     return res, jacobian
 end
 
-function apply(op::OperatorChain, val, jac)
+function (op::OperatorChain)(val, jac)
     res = copy(val)
     for operator in op.operators
         #TODO here, res can be modified by apply, so pointwise operators don't need to make a copy
-        res, jac = apply(operator, res, jac)
+        res, jac = operator(res, jac)
     end
     return res, jac
 end
 
-       
+####################################################################################################
+####################################################################################################
+#miscellaneous
+
+adjoint(op::LinearOperator) = LinearOperator(target(op), domain(op), op.adjoints, op.operations)
 
 
 
-#Sugar: exp(domain) = PointwiseOperator(domain, exp, exp, exp)
+exp(dom) = PointwiseOperator(dom, [exp], [exp])
+log(dom) = PointwiseOperator(dom, [log], [inv])
+sin(dom) = PointwiseOperator(dom, [cos], [sin])
+cos(dom) = PointwiseOperator(dom, [cos], [-, sin])
+add(dom, val::Number) = PointwiseOperator(dom, [x -> +(x, val)], [identity])
+scale(dom, val::Number) = PointwiseOperator(dom, [x -> *(x, val)], [identity])
 
-#Operator Interface
-#   domain(op) = op.domain
-#
-#   target(op)
-#
-#   operators(op)   -> Pointwise: op
-#                   -> Linear: op
-#                   -> Combined: op.operators
-#
-#   reverse(op)     -> Pointwise: reverse(ops)
-#                   -> Linear: reverse(adjoint(ops))
-#
-#   getjacobian(op) -> Pointwise: return y -> op'(x) .* y, op(x)
-#                   -> Linear: return op(x), op(x)
-#
 
-#
-#function combine_operators(outer, inner)
-#    @assert domain(outer) == target(inner)
-#    operations = _combine_operators(outer, inner)
-#    return make_Operator(domain(inner), target(outer), operations)
-#end
-#
-#
-#
-#function getjacobian(val, jacobian, ops, grads)
-#    gradient = ones(size(val))
-#    new_val = copy(val)
-#    for (op, grad) in zip(ops, grads)
-#        gradient .*= grad.(new_val)
-#        new_val .= op.(new_val)
-#    end
-#    new_jacobian(x) = gradient .* jacobian(x) 
-#    return new_val, new_jacobian
-#end
-#
-#
-#function getjacobian(val, jacobian, ops)
-#    gradient = ones(size(val))
-#    new_val = copy(val)
-#    apply(x) = begin
-#        new_x = copy(x)
-#        for op in ops
-#            new_x .= op(x)
-#        end
-#        return new_x
-#    end
-#    new_jacobian(x) = apply(jacobian(x))
-#    return apply(val), new_jacobian
-#end
-#
-#
+hartley(dom) = LinearOperator(dom, getcodomain(dom), [hartley], [hartley])

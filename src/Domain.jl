@@ -43,12 +43,13 @@ struct PowerDomain{N, Dom} <: StructuredDomain{N} where Dom <: RGDomain{_N, true
         pindices = get_pindices(size(domain), kvec, karr)
         typeof(domain) == DataType ? new{N, domain}(pindices, kvec) : new{N, typeof(domain)}(pindices, kvec)
     end
-    PowerDomain(shape...; distances = 1 ./ shape, dtype = Float64) = begin
-        @assert length(shape) == length(distances)
-        kvec, karr = get_k_vals(shape, distances, dtype)
+    PowerDomain(shape...; T = Float64, lengths = T.(shape)) = begin
+        @assert length(shape) == length(lengths)
+        distances = lengths ./ shape
+        kvec, karr = get_k_vals(shape, distances, T)
         pindices = get_pindices(shape, kvec, karr)
-        domain = RGDomain(shape; distances = distances, harmonic = true, dtype = dtype)
-        new{dims(domain), domain}(pindices, kvec)
+        domain = RGDomain(shape...; T = T, lengths = lengths, harmonic = true)
+        new{dims(domain), typeof(domain)}(pindices, kvec)
     end
 end
 
