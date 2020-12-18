@@ -1,15 +1,5 @@
 #TODO handle identity separately in pointwise operators
-
-
 abstract type AbstractOperator end
-
-struct Operator <: AbstractOperator
-    domain::AbstractDomain
-    target::AbstractDomain
-    operation
-    gradient
-    reverse
-end
 
 struct LinearOperator <: AbstractOperator
     domain::AbstractDomain
@@ -34,9 +24,6 @@ end
 ####################################################################################################
 ####################################################################################################
 #Property interfaces
-domain(op::Operator) = op.domain
-target(op::Operator) = op.target
-
 domain(op::LinearOperator) = op.domain
 target(op::LinearOperator) = op.target
 
@@ -84,17 +71,14 @@ end
 
 #TODO generalize to NTuple for val
 function (op::AbstractOperator)(val)
-    res = deepcopy(val)
-    return apply!(op, val)
+    return apply(op, val)
 end
 
 function (op::AbstractOperator)(vals...)
-    res = deepcopy(vals)
-    res = apply!(op, res)
-    return res
+    return apply(op, vals)
 end
 
-function apply!(op::LinearOperator, val::AbstractArray)
+function apply(op::LinearOperator, val::AbstractArray)
     for operation in op.operations
         val = operation(val)
     end
@@ -102,37 +86,26 @@ function apply!(op::LinearOperator, val::AbstractArray)
 end
 
 #TODO generalize to NTuple for val
-function apply!(op::PointwiseOperator, val::AbstractArray)
-    for operation in op.operations
-        @avx @. val = operation(val)
+function apply(op::PointwiseOperator, val::AbstractArray)
+    res = @avx @. op.operations[1](val)
+    for operation in op.operations[2:end]
+        @avx @. res = operation(res)
     end
-    return val
+    return res
 end
 
-function apply!(op::OperatorChain, val)
+function apply(op::OperatorChain, val)
     for operator in op.operators
-        val = apply!(operator, val)
+        val = apply(operator, val)
     end
     return val
 end
 
 
-#function apply!(op::AdditionOperator, val1, val2)
-#    @avx @. val1 += val2
-#end
-#function apply!(op::MultiplicationOperator, val1, val2)
-#    @avx @. val1 *= val2
-#end
 ####################################################################################################
 ####################################################################################################
 #apply linearization Interface
 
-#function (op::Operator)(val, jac)
-#    new_jac(x) = op.jacobian(val, jac(x))
-#    new_val = op.operation(val)
-#    return (new_val, new_jac)
-#end
-#
 #function (op::LinearOperator)(val, jac)
 #    res = op(val)
 #    jacobian(x) = op(jac(x))
@@ -165,15 +138,14 @@ end
 
 adjoint(op::LinearOperator) = LinearOperator(target(op), domain(op), op.adjoints, op.operations)
 
-
-
 exp(dom::AbstractDomain) = PointwiseOperator(dom, [exp], [exp])
-exp(op::AbstractOperator) = PointwiseOperator(target(op), [exp], [exp])(op)
 log(dom) = PointwiseOperator(dom, [log], [inv])
 sin(dom) = PointwiseOperator(dom, [cos], [sin])
 cos(dom) = PointwiseOperator(dom, [cos], [-, sin])
 add(dom, val::Number) = PointwiseOperator(dom, [x -> +(x, val)], [identity])
 scale(dom, val::Number) = PointwiseOperator(dom, [x -> *(x, val)], [identity])
 
+exp(op::AbstractOperator) = PointwiseOperator(target(op), [exp], [exp])(op)
 
 hartley(dom) = LinearOperator(dom, getcodomain(dom), [hartley], [hartley])
+fourier(dom) = LinearOperator(dom, getcodomain(dom), [fft], [fft])
