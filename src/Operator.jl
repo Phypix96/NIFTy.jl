@@ -24,14 +24,10 @@ end
 ####################################################################################################
 ####################################################################################################
 #Property interfaces
-domain(op::LinearOperator) = op.domain
-target(op::LinearOperator) = op.target
+domain(op::AbstractOperator) = op.domain
+target(op::AbstractOperator) = op.target
 
-domain(op::PointwiseOperator) = op.domain
 target(op::PointwiseOperator) = op.domain
-
-domain(op::OperatorChain) = op.domain
-target(op::OperatorChain) = op.target
 
 get_operators(op::AbstractOperator) = identity(op)
 get_operators(op::OperatorChain) = op.operators
@@ -135,17 +131,4 @@ end
 ####################################################################################################
 ####################################################################################################
 #miscellaneous
-
 adjoint(op::LinearOperator) = LinearOperator(target(op), domain(op), op.adjoints, op.operations)
-
-exp(dom::AbstractDomain) = PointwiseOperator(dom, [exp], [exp])
-log(dom) = PointwiseOperator(dom, [log], [inv])
-sin(dom) = PointwiseOperator(dom, [cos], [sin])
-cos(dom) = PointwiseOperator(dom, [cos], [-, sin])
-add(dom, val::Number) = PointwiseOperator(dom, [x -> +(x, val)], [identity])
-scale(dom, val::Number) = PointwiseOperator(dom, [x -> *(x, val)], [identity])
-
-exp(op::AbstractOperator) = PointwiseOperator(target(op), [exp], [exp])(op)
-
-hartley(dom) = LinearOperator(dom, getcodomain(dom), [hartley], [hartley])
-fourier(dom) = LinearOperator(dom, getcodomain(dom), [fft], [fft])

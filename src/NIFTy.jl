@@ -2,7 +2,7 @@ module NIFTy
 
 import Base: size, length, eltype, getindex, setindex!, IndexStyle, randn, similar
 import Base: adjoint
-import Base: exp, log, sin, cos
+import Base: exp, log, sin, cos, +, *
 
 import FFTW: fft, ifft
 
@@ -13,6 +13,7 @@ include("Field.jl")
 include("Operator.jl")
 include("Functions.jl")
 include("Distributor.jl")
+include("OperatorLibrary.jl")
 
 export AbstractDomain, Domain, UnstructuredDomain, StructuredDomain,
        RGDomain, PowerDomain, DomainTuple,
@@ -28,8 +29,10 @@ export AbstractDomain, Domain, UnstructuredDomain, StructuredDomain,
        #Operator.jl
        AbstractOperator, LinearOperator, PointwiseOperator, OperatorChain, Operator,
        domain, target, adjoint,
-       combine_operators, apply!, apply,
-       add, scale,
+       combine_operators, apply,
        #Distributor.jl
-       DistributionOperator, PowerDistributor
+       DistributionOperator, PowerDistributor,
+       #OperatorLibrary.jl
+       add, scale,
+       AdditionOperator, SubtractionOperator, MultiplicationOperator, DivisionOperator
 end
