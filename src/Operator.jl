@@ -1,12 +1,7 @@
 #TODO handle identity separately in pointwise operators
 abstract type AbstractOperator end
 
-struct LinearOperator <: AbstractOperator
-    domain::AbstractDomain
-    target::AbstractDomain
-    operations::Array
-    adjoints::Array
-end
+abstract type  LinearOperator <: AbstractOperator end
 
 struct PointwiseOperator <: AbstractOperator
     domain::AbstractDomain
@@ -39,13 +34,6 @@ function (op_later::AbstractOperator)(op_first::AbstractOperator)
     return combine_operators(op_later, op_first)
 end
 
-
-function combine_operators(op_later::LinearOperator, op_first::LinearOperator)
-    @assert target(op_first) == domain(op_later)
-    operations = vcat(op_first.operations, op_later.operations)
-    adjoints = vcat(op_later.adjoints, op_first.adjoints)
-    return LinearOperator(op_later.domain, op_first.target, operations, adjoints)
-end
 
 function combine_operators(op_later::PointwiseOperator, op_first::PointwiseOperator)
     @assert domain(op_later) == domain(op_first)

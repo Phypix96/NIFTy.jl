@@ -2,7 +2,7 @@ module NIFTy
 
 import Base: size, length, eltype, getindex, setindex!, IndexStyle, randn, similar
 import Base: adjoint
-import Base: exp, log, sin, cos, +, *
+import Base: exp, log, sin, cos, +, -, *, /
 
 import FFTW: fft, ifft
 
@@ -34,5 +34,6 @@ export AbstractDomain, Domain, UnstructuredDomain, StructuredDomain,
        DistributionOperator, PowerDistributor,
        #OperatorLibrary.jl
        add, scale,
-       AdditionOperator, SubtractionOperator, MultiplicationOperator, DivisionOperator
+       AdditionOperator, SubtractionOperator, MultiplicationOperator, DivisionOperator,
+       HartleyOperator, FourierOperator
 end

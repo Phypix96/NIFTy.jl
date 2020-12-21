@@ -8,15 +8,28 @@ log1p(dom) = PointwiseOperator(dom, [log1p], [x -> 1/(1 + x)])
 sin(dom) = PointwiseOperator(dom, [cos], [sin])
 cos(dom) = PointwiseOperator(dom, [cos], [sin, -])
 
-add(dom, val::Number) = PointwiseOperator(dom, [x -> +(x, val)], [identity])
-scale(dom, val::Number) = PointwiseOperator(dom, [x -> *(x, val)], [identity])
+add(dom, val::Union{Number, AbstractArray{Number}}) = PointwiseOperator(dom, [x -> +(x, val)], [identity])
+scale(dom, val::Union{Number, AbstractArray{Number}}) = PointwiseOperator(dom, [x -> *(x, val)], [x -> *(x, val)])
 
 ####################################################################################################
 ####################################################################################################
 #Simple Linear Operators
-hartley(dom) = LinearOperator(dom, getcodomain(dom), [hartley], [hartley])
-fourier(dom) = LinearOperator(dom, getcodomain(dom), [fft], [fft])
+struct HartleyOperator <: LinearOperator
+    domain::StructuredDomain{N, true} where N
+end
+target(op::HartleyOperator) = getcodomain(op.domain)
+apply(op::HartleyOperator, val) = hartley(val)
+adjoint(op::HartleyOperator, val) = apply(op, val)
 
+hartley(op::AbstractOperator) = combine_operators(HartleyOperator(target(op)), op)
+
+
+struct FourierOperator <: LinearOperator
+    domain::StructuredDomain{N, true} where N
+end
+target(op::FourierOperator) = getcodomain(op.domain)
+apply(op::FourierOperator, val) = fft(val)
+#adjoint(op::FourierOperator, val) = fft(conj.(val))
 
 ####################################################################################################
 ####################################################################################################
@@ -74,31 +87,32 @@ function apply(op::AdditionOperator, vals)
     #TODO replace zeros(size(target)) with zeros(target)
     res = zeros(size(target(op)))
     for (operation, val) in zip(op.operators, vals)
-        res .+= operation(val)
+        res .+= apply(operation, val)
     end
     return res
 end
 
 function apply(op::SubtractionOperator, (val1, val2))
-    return op.operators[1](val1) .- op.operators[2](val2)
+    return apply(op.operators[1], val1) .- apply(op.operators[2], val2)
 end
 
 function apply(op::MultiplicationOperator, vals)
     #TODO replace zeros(size(target)) with zeros(target)
     res = ones(size(target(op)))
     for (operation, val) in zip(op.operators, vals)
-        res .*= operation(val)
+        res .*= apply(operation, val)
     end
     return res
 end
 
 function apply(op::SubtractionOperator, (val1, val2))
-    return op.operators[1](val1) ./ op.operators[2](val2)
+    return apply(op.operators[1], val1) ./ apply(op.operators[2], val2)
+end
 end
 ####################################################################################################
 ####################################################################################################
 #Convenience Methods
-for f in [:exp, :expm1, :log, :log1p, :sin, :cos, :hartley, :fourier]
+for f in [:exp, :expm1, :log, :log1p, :sin, :cos]
     @eval $f(op::AbstractOperator) = combine_operators($f(target(op)), op)
 end
 
