@@ -3,14 +3,14 @@
 abstract type AbstractDomain{N} end
 abstract type Domain{N}  <: AbstractDomain{N} end
 abstract type UnstructuredDomain{N} <: Domain{N} end
-abstract type StructuredDomain{N} <: Domain{N} end
+abstract type StructuredDomain{N, H} <: Domain{N} where H end
 
 dims(::AbstractDomain{N}) where {N} = N
 ################################################################################
 ################################################################################
 #RGDomain
 
-struct RGDomain{N, H, L} <: StructuredDomain{N}
+struct RGDomain{N, H, L} <: StructuredDomain{N, H}
     _shape::NTuple{N, UInt}
     _lengths::NTuple{N, T} where T
     RGDomain(shape...;
@@ -38,8 +38,8 @@ end
 ################################################################################
 #Power Domain
 
-struct PowerDomain{N, Dom} <: StructuredDomain{N} where Dom <: RGDomain{_N, true, _L} where {_N, _L}
-    _codomain::StructuredDomain{N}
+struct PowerDomain{N, Dom} <: StructuredDomain{N, true} where Dom <: RGDomain{_N, true, _L} where {_N, _L}
+    _codomain::StructuredDomain{N, true}
     _pindices::Array{UInt32, N}
     _kvec::Array{T, 1} where T <: Real
     PowerDomain(domain::RGDomain{N, true, L}, T = Float64) where {N, L} = begin
