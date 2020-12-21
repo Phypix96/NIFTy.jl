@@ -15,6 +15,17 @@ struct Field{T, N, Dom} <: AbstractArray{T, N} where Dom <: AbstractDomain
     end
 end
 
+struct MultiField
+    domain::Union{Tuple, NamedTuple}
+    val::Union{Tuple, NamedTuple}
+end
+
+function MultiField(fs::Union{Field, MultiField}...)
+    domains = Tuple(f.domain for f in fs)
+    vals = Tuple(f.val for f in fs)
+    return MultiField(domains, vals)
+end
+
 #Implement correct broadcasting behaviour
 #Pointwise operations on a field should always default to preserving the domain
 #Binary broadcasting is only well defined for fields with matching domains
@@ -55,7 +66,5 @@ randn(::Type{T}, d::AbstractDomain) where T <: Integer = Field(d, round.(T, rand
 pindices(ps::Field{T, N, PD}) where {T, N, PD <: PowerDomain} = ps.domain._pindices
 
 #MultiField: named tuples of fields
-#
-#
-#
-#
+
+

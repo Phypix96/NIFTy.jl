@@ -65,20 +65,18 @@ end
 ####################################################################################################
 #apply Interface
 
-#TODO generalize to NTuple for val
-function (op::AbstractOperator)(val)
-    return apply(op, val)
+function (op::AbstractOperator)(f::Union{Field, MultiField})
+    @assert f.domain == domain(op)
+    return apply(op, f.val)
 end
 
-function (op::AbstractOperator)(vals...)
+#function (op::AbstractOperator)(vals...)
+#    return apply(op, vals)
+#end
+
+function apply(op::AbstractOperator, vals::NamedTuple)
+    vals = [vals[key] for key in keys(domain(op))]
     return apply(op, vals)
-end
-
-function apply(op::LinearOperator, val::AbstractArray)
-    for operation in op.operations
-        val = operation(val)
-    end
-    return val
 end
 
 #TODO generalize to NTuple for val
