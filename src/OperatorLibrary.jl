@@ -108,7 +108,6 @@ end
 function apply(op::SubtractionOperator, (val1, val2))
     return apply(op.operators[1], val1) ./ apply(op.operators[2], val2)
 end
-end
 ####################################################################################################
 ####################################################################################################
 #Convenience Methods
