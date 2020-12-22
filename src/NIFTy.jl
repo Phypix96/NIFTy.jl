@@ -5,6 +5,7 @@ import Base: adjoint
 import Base: exp, log, sin, cos, +, -, *, /
 
 import FFTW: fft, ifft
+using FFTW
 
 using LoopVectorization
 

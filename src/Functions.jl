@@ -25,12 +25,10 @@ function ifft(f::Field{T, N, Dom}) where {T, N, Dom <: RGDomain}
 end
 
 function hartley(f::Array)
-    ft = fft(f)
-    return real(ft) + imag(ft)
+    return FFTW.r2r(f, FFTW.DHT)
 end
 
 function ihartley(f::Array)
-    ft = ifft(f)
-    return real(ft) + imag(ft)
+    return hartley(f) ./ size(f)
 end
 
