@@ -24,13 +24,12 @@ function ifft(f::Field{T, N, Dom}) where {T, N, Dom <: RGDomain}
     return field(new_dom, val)
 end
 
-function hartley(f::Array)
+function hartley(f::AbstractArray)
     ft = fft(f)
     return real(ft) + imag(ft)
 end
 
-function ihartley(f::Array)
+function ihartley(f::AbstractArray)
     ft = ifft(f)
     return real(ft) + imag(ft)
 end
-

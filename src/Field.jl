@@ -6,9 +6,12 @@
 ################################################################################
 ################################################################################
 #Field type
-struct Field{T, N, Dom} <: AbstractArray{T, N} where Dom <: AbstractDomain
+abstract type AbstractField{T, N, Dom} <: AbstractArray{T, N} where Dom <: AbstractDomain end
+struct Field{T, N, Dom} <: AbstractField{T, N, Dom}
+#struct Field{T, N, Dom} <: AbstractArray{T, N} where Dom <: AbstractDomain
     domain::Dom
-    val::Array{T, N}
+    val::AbstractArray{T, N}
+    #val::A{T, N} where A <: AbstractArray{T, N}
     Field(domain, val) = begin
         @assert size(domain) == size(val)
         new{eltype(val), dims(domain), typeof(domain)}(domain, val)
@@ -29,13 +32,14 @@ similar(f::Field) = similar(f, eltype(f), size(f))
 similar(f::Field, ::Type{T}, ::Tuple{Vararg{Int64, N}}) where {T, N} = Field(f.domain, similar(f.val, T))
 function similar(bc::Broadcast.Broadcasted{FieldStyle{N, Dom}}, ::Type{ElType}) where {N, Dom, ElType}
     domain = getdomain(bc)
-    return Field(domain, similar(Array{ElType}, axes(bc)))
+    valtype = getvaltype(bc)
+    return Field(domain, similar(valtype, axes(bc)))
 end
 
-getdomain(bc::Base.Broadcast.Broadcasted) = getdomain(bc.args...)
-#TODO assure, that all args have the same domain?
-getdomain(args::Vararg{Field}) = getdomain(args[1])
+getdomain(bc::Base.Broadcast.Broadcasted) = getdomain(bc.args[1])
 getdomain(f::Field) = f.domain
+getvaltype(bc::Base.Broadcast.Broadcasted) = getvaltype(bc.args[1])
+getvaltype(f::Field) = typeof(f.val)
 
 shape(f::Field) = shape(f.domain)
 size(f::Field) = Int.(size(f.val))
@@ -55,7 +59,22 @@ randn(::Type{T}, d::AbstractDomain) where T <: Integer = Field(d, round.(T, rand
 pindices(ps::Field{T, N, PD}) where {T, N, PD <: PowerDomain} = ps.domain._pindices
 
 #MultiField: named tuples of fields
+
+
+
+struct Linearization{T, N, Dom} <: AbstractField{T, N, Dom}
+    val::Field{T, N, Dom}
+    jacobian
+end
 #
+#struct LinearizationStyle{N, Dom} <: Broadcast.AbstractArrayStyle{N} end
+#Base.BroadcastStyle(::Type{<:Linearization{T, N, Dom}}) where {T, N, Dom} = LinearizationStyle{N, Dom}()
+#Base.BroadcastStyle(::LinearizationStyle{N, Dom}, ::LinearizationStyle{N, Dom}) where {N, Dom} = LinearizationStyle{N, Dom}()
+#Base.BroadcastStyle(::LinearizationStyle, ::LinearizationStyle) = error("Domain mismatch")
 #
-#
-#
+#function similar(bc::Broadcast.Broadcasted{LinearizationStyle{N, Dom}}, ::Type{ElType}) where {N, Dom, ElType}
+#    val = getval(bc)
+#    jacobian = getjacobian(bc)
+#    new_jacobian(x) = val .* jacobian(x)
+#    return Linearization(similar(val), new_jacobian)
+#end
